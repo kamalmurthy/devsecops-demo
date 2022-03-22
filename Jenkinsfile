@@ -25,9 +25,7 @@ pipeline {
     stage('SonarQube - SAST') {
       steps {
         withSonarQubeEnv('SonarQube') {
-          sh "mvn sonar:sonar \
-                  -Dsonar.projectKey=numeric-application \
-                  -Dsonar.host.url=http://devsecops-demo.eastus.cloudapp.azure.com:9000"
+          sh "mvn sonar:sonar"
         }
         timeout(time: 2, unit: 'MINUTES') {
           script {
@@ -45,18 +43,18 @@ pipeline {
 
     stage('Docker Build and Push') {
       steps {
-        withDockerRegistry([credentialsId: "docker-hub", url: ""]) {
+        withDockerRegistry([credentialsId: "dockerhub", url: ""]) {
           sh 'printenv'
-          sh 'docker build -t siddharth67/numeric-app:""$GIT_COMMIT"" .'
-          sh 'docker push siddharth67/numeric-app:""$GIT_COMMIT""'
+          sh 'docker build -t kamalmurthy/numeric-app:""$GIT_COMMIT"" .'
+          sh 'docker push kamalmurthy/numeric-app:""$GIT_COMMIT""'
         }
       }
     }
 
     stage('Kubernetes Deployment - DEV') {
       steps {
-        withKubeConfig([credentialsId: 'kubeconfig']) {
-          sh "sed -i 's#replace#siddharth67/numeric-app:${GIT_COMMIT}#g' k8s_deployment_service.yaml"
+        withKubeConfig([credentialsId: 'kubeconf']) {
+          sh "sed -i 's#replace#kamalmurthy/numeric-app:${GIT_COMMIT}#g' k8s_deployment_service.yaml"
           sh "kubectl apply -f k8s_deployment_service.yaml"
         }
       }
