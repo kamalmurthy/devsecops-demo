@@ -1,3 +1,21 @@
+## opa-docker-security.rego
+Get the rego policy from -
+https://github.com/gbrindisi/dockerfile-security
+
+
+
+## Updated Dockerfile
+FROM adoptopenjdk/openjdk8:alpine-slim
+EXPOSE 8080
+ARG JAR_FILE=target/*.jar
+RUN addgroup -S pipeline && adduser -S k8s-pipeline -G pipeline
+COPY ${JAR_FILE} /home/k8s-pipeline/app.jar
+USER k8s-pipeline
+ENTRYPOINT ["java","-jar","/home/k8s-pipeline/app.jar"]
+
+
+
+## Jenkinsfile - OPA Conftest - Docker Stage
 pipeline {
   agent any
 
@@ -25,7 +43,9 @@ pipeline {
     stage('SonarQube - SAST') {
       steps {
         withSonarQubeEnv('SonarQube') {
-          sh "mvn sonar:sonar"
+          sh "mvn sonar:sonar \
+		              -Dsonar.projectKey=numeric-application \
+		              -Dsonar.host.url=http://devsecops-demo.eastus.cloudapp.azure.com:9000"
         }
         timeout(time: 2, unit: 'MINUTES') {
           script {
@@ -35,7 +55,7 @@ pipeline {
       }
     }
 
-     stage('Vulnerability Scan - Docker') {
+    stage('Vulnerability Scan - Docker') {
       steps {
         parallel(
           "Dependency Scan": {
@@ -53,18 +73,18 @@ pipeline {
 
     stage('Docker Build and Push') {
       steps {
-        withDockerRegistry([credentialsId: "dockerhub", url: ""]) {
+        withDockerRegistry([credentialsId: "docker-hub", url: ""]) {
           sh 'printenv'
-          sh 'sudo docker build -t kamalmurthy/numeric-app:""$GIT_COMMIT"" .'
-          sh 'docker push kamalmurthy/numeric-app:""$GIT_COMMIT""'
+          sh 'sudo docker build -t siddharth67/numeric-app:""$GIT_COMMIT"" .'
+          sh 'docker push siddharth67/numeric-app:""$GIT_COMMIT""'
         }
       }
     }
 
     stage('Kubernetes Deployment - DEV') {
       steps {
-        withKubeConfig([credentialsId: 'kubeconf']) {
-          sh "sed -i 's#replace#kamalmurthy/numeric-app:${GIT_COMMIT}#g' k8s_deployment_service.yaml"
+        withKubeConfig([credentialsId: 'kubeconfig']) {
+          sh "sed -i 's#replace#siddharth67/numeric-app:${GIT_COMMIT}#g' k8s_deployment_service.yaml"
           sh "kubectl apply -f k8s_deployment_service.yaml"
         }
       }
